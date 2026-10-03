@@ -65,14 +65,23 @@ app.post("/send-single", async (req, res) => {
         tag: notifTag ? String(notifTag) : '',
     });
 
-    // Pure data payload for Android (high priority) triggers FirebaseMessaging.onBackgroundMessage
-    // so FlutterLocalNotificationsPlugin builds custom tiles with "Mark as read", "Reply", and MessagingStyleInformation.
-    // iOS receives standard APNs alert payload.
+    // Dual payload: standard notification for instant system tray alert on Android & iOS,
+    // plus data payload for rich background handling, inline actions & deep linking.
     const message = {
         token: token,
+        notification: {
+            title: title,
+            body: body,
+        },
         data: payloadData,
         android: {
             priority: 'high',
+            notification: {
+                channelId: 'high_importance_channel',
+                clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                sound: 'default',
+                tag: notifTag ? String(notifTag) : undefined,
+            },
         },
         apns: {
             payload: {
@@ -122,9 +131,19 @@ app.post("/send-multiple", async (req, res) => {
 
     const message = {
         tokens: tokens,
+        notification: {
+            title: title,
+            body: body,
+        },
         data: payloadData,
         android: {
             priority: 'high',
+            notification: {
+                channelId: 'high_importance_channel',
+                clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                sound: 'default',
+                tag: notifTag ? String(notifTag) : undefined,
+            },
         },
         apns: {
             payload: {
