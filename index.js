@@ -176,6 +176,69 @@ app.post("/send-multiple", async (req, res) => {
     }
 });
 
+app.post("/notify-update", async (req, res) => {
+    const { versionName, versionCode, releaseNotes, forceUpdate } = req.body || {};
+    const cleanVersion = String(versionName || "").replace(/^v/i, "").trim();
+    const buildNum = String(versionCode || "").trim();
+
+    if (!cleanVersion && !buildNum) {
+        return res.status(400).send("versionName or versionCode is required");
+    }
+
+    const displayVersion = cleanVersion || `b${buildNum}`;
+    const isForced = forceUpdate === true || forceUpdate === "true";
+    const title = isForced
+        ? `⚡ Required Update: Worship Chat v${displayVersion}`
+        : `✨ Worship Chat v${displayVersion} Available`;
+
+    const summary = String(releaseNotes || "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !/^sha256\s*:/i.test(line))
+        .slice(0, 2)
+        .join(" • ");
+    const body = summary
+        ? (summary.length > 140 ? summary.slice(0, 137) + "..." : summary)
+        : `Tap to download and install Build ${buildNum || "latest"}.`;
+
+    const payloadData = sanitizeData({
+        type: "app_update",
+        versionName: displayVersion,
+        versionCode: buildNum,
+        releaseNotes: String(releaseNotes || "").trim(),
+        forceUpdate: isForced ? "true" : "false",
+        title,
+        body,
+    });
+
+    const message = {
+        topic: "app_updates",
+        notification: {
+            title,
+            body,
+        },
+        data: payloadData,
+        android: {
+            priority: "high",
+            notification: {
+                channelId: "app_updates_channel",
+                clickAction: "FLUTTER_NOTIFICATION_CLICK",
+                sound: "default",
+                tag: "app_update",
+            },
+        },
+    };
+
+    try {
+        const response = await admin.messaging().send(message);
+        console.log("Update topic notification sent:", response);
+        return res.status(200).send({ messageId: response });
+    } catch (e) {
+        console.error("Error sending update notification:", e);
+        return res.status(500).send("Error sending update notification");
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
